@@ -220,11 +220,29 @@
   <button class="btn-add-student" onclick="addStudent()">➕ 新增學生</button>
   <button class="btn-main" onclick="openPrizeModal()">🎁 編輯扭蛋獎品</button>
   <button class="btn-warn" onclick="resetAllScores()">🔄 重設所有分數</button>
+  <button class="modal-close" onclick="openClassCodeModal()">🔑 班級代碼：<span id="classCodeLabel">--</span></button>
 </div>
+
+<div id="syncStatus" style="text-align:center; margin-bottom:10px; color:#9c8a7d; font-size:0.85rem;"></div>
 
 <div class="grid" id="studentGrid"></div>
 
-<footer>加滿 10 分即可扭蛋一次 · 資料自動儲存在此瀏覽器中</footer>
+<footer>加滿 10 分即可扭蛋一次 · 資料即時同步到雲端，換瀏覽器/裝置輸入同一個班級代碼即可看到相同資料</footer>
+
+<!-- 班級代碼彈窗 -->
+<div class="modal-overlay" id="classCodeModal">
+  <div class="modal">
+    <h2>🔑 設定班級代碼</h2>
+    <p style="font-size:0.95rem; color:#7a6a5d;">
+      第一次使用請自訂一個只有你知道的代碼（例如：王老師302）。<br>
+      之後在任何瀏覽器/裝置輸入同一個代碼，就會看到同一份學生與分數資料。
+    </p>
+    <input id="classCodeInput" placeholder="輸入班級代碼" style="width:100%; padding:12px; font-size:1.1rem; border-radius:10px; border:2px solid #ffe0ec; text-align:center; margin:10px 0;">
+    <br>
+    <button class="btn-main" onclick="submitClassCode()">✅ 進入</button>
+    <button class="modal-close" onclick="closeClassCodeModalIfSet()">取消</button>
+  </div>
+</div>
 
 <!-- 扭蛋彈窗 -->
 <div class="modal-overlay" id="gachaModal">
@@ -248,20 +266,97 @@
 </div>
 
 <script src="pokemon-data.js"></script>
-<script>
-const STORAGE_KEY = "gacha_students_v1";
-const PRIZE_KEY = "gacha_prizes_v1";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAQll2Xvf321l3c9WYQehXFinMXY6u8LGc",
+  authDomain: "classroom-gacha-rewards.firebaseapp.com",
+  projectId: "classroom-gacha-rewards",
+  storageBucket: "classroom-gacha-rewards.firebasestorage.app",
+  messagingSenderId: "508693241214",
+  appId: "1:508693241214:web:8d8c0dbb5ee0dfca5de72f"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+const CLASS_CODE_KEY = "gacha_class_code";
 const GOAL = 10;
 
 const defaultStudents = Array.from({length: 10}, (_, i) => ({ name: `學生 ${i+1}`, score: 0 }));
 const defaultPrizes = ["寶可夢卡片", "小玩具", "原子筆一隻", "飲料一罐", "貼紙一張"];
 
-let students = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || defaultStudents;
-let prizes = JSON.parse(localStorage.getItem(PRIZE_KEY) || "null") || defaultPrizes;
+let students = defaultStudents;
+let prizes = defaultPrizes;
+let classCode = "";
+let unsubscribe = null;
+let saveTimer = null;
+
+function classDocRef(code) {
+  return doc(db, "classes", code);
+}
+
+function setSyncStatus(text) {
+  document.getElementById("syncStatus").textContent = text;
+}
+
+async function connectClass(code) {
+  classCode = code.trim();
+  if (!classCode) return;
+  localStorage.setItem(CLASS_CODE_KEY, classCode);
+  document.getElementById("classCodeLabel").textContent = classCode;
+  if (unsubscribe) unsubscribe();
+  setSyncStatus("☁️ 連線中...");
+
+  const ref = classDocRef(classCode);
+  try {
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, { students: defaultStudents, prizes: defaultPrizes });
+    }
+  } catch (e) {
+    setSyncStatus("⚠️ 連線失敗，請檢查網路後重新整理");
+    console.error(e);
+    return;
+  }
+
+  unsubscribe = onSnapshot(ref, (snap) => {
+    const data = snap.data();
+    if (!data) return;
+    students = data.students || [];
+    prizes = data.prizes || [];
+    renderStudents();
+    setSyncStatus("☁️ 已同步");
+  }, (err) => {
+    setSyncStatus("⚠️ 連線失敗，請檢查網路後重新整理");
+    console.error(err);
+  });
+}
+
+function openClassCodeModal() {
+  document.getElementById("classCodeInput").value = classCode;
+  document.getElementById("classCodeModal").classList.add("show");
+}
+function closeClassCodeModalIfSet() {
+  if (classCode) document.getElementById("classCodeModal").classList.remove("show");
+}
+function submitClassCode() {
+  const value = document.getElementById("classCodeInput").value.trim();
+  if (!value) { alert("請輸入班級代碼"); return; }
+  document.getElementById("classCodeModal").classList.remove("show");
+  connectClass(value);
+}
 
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
-  localStorage.setItem(PRIZE_KEY, JSON.stringify(prizes));
+  if (!classCode) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    setDoc(classDocRef(classCode), { students, prizes }).catch(err => {
+      setSyncStatus("⚠️ 儲存失敗，請檢查網路");
+      console.error(err);
+    });
+  }, 300);
 }
 
 function renderStudents() {
@@ -405,7 +500,21 @@ function removePrize(idx) {
   renderPrizeList();
 }
 
+Object.assign(window, {
+  addStudent, removeStudent, renameStudent, changeScore, resetAllScores,
+  playGacha, closeGachaModal, openPrizeModal, closePrizeModal,
+  addPrizeRow, removePrize, updatePrize,
+  openClassCodeModal, closeClassCodeModalIfSet, submitClassCode
+});
+
 renderStudents();
+
+const savedCode = localStorage.getItem(CLASS_CODE_KEY);
+if (savedCode) {
+  connectClass(savedCode);
+} else {
+  openClassCodeModal();
+}
 </script>
 </body>
 </html>

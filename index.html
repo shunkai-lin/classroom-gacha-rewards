@@ -18,9 +18,37 @@
     margin: 0;
     font-family: "Microsoft JhengHei", "PingFang TC", "Heiti TC", sans-serif;
     background: linear-gradient(135deg, #fff7ec, #ffe9d6);
+    background-size: cover;
+    background-attachment: fixed;
     min-height: 100vh;
     padding: 16px;
     color: #4a3b32;
+    transition: background 0.4s;
+  }
+  body.bg-comic-1 {
+    background:
+      radial-gradient(circle, rgba(255,255,255,0.85) 2px, transparent 2.5px) 0 0/22px 22px,
+      linear-gradient(135deg, #ffd23f, #ff8a65);
+  }
+  body.bg-comic-2 {
+    background:
+      repeating-conic-gradient(from 0deg, rgba(255,255,255,0.9) 0deg 4deg, transparent 4deg 16deg),
+      radial-gradient(circle at 50% 50%, #ff6fa5, #b388ff);
+  }
+  body.bg-comic-3 {
+    background:
+      radial-gradient(circle, rgba(255,255,255,0.8) 3px, transparent 3.5px) 0 0/30px 30px,
+      linear-gradient(135deg, #4cc9f0, #6fd66f);
+  }
+  body.bg-comic-4 {
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.5) 0 6px, transparent 6px 18px),
+      linear-gradient(135deg, #ff6fa5, #ffd23f);
+  }
+  body.bg-custom {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
   }
   h1 {
     text-align: center;
@@ -224,6 +252,7 @@
   <button class="btn-main" onclick="openPrizeModal()">🎁 編輯扭蛋獎品</button>
   <button class="btn-warn" onclick="resetAllScores()">🔄 重設所有分數</button>
   <button class="modal-close" onclick="openClassCodeModal()">🔑 班級代碼：<span id="classCodeLabel">--</span></button>
+  <button class="btn-main" onclick="openBgModal()">🖼️ 背景設定</button>
 </div>
 
 <div id="syncStatus" style="text-align:center; margin-bottom:10px; color:#9c8a7d; font-size:0.85rem;"></div>
@@ -244,6 +273,21 @@
     <br>
     <button class="btn-main" onclick="submitClassCode()">✅ 進入</button>
     <button class="modal-close" onclick="closeClassCodeModalIfSet()">取消</button>
+  </div>
+</div>
+
+<!-- 背景設定彈窗 -->
+<div class="modal-overlay" id="bgModal">
+  <div class="modal">
+    <h2>🖼️ 背景設定</h2>
+    <p style="font-size:0.95rem; color:#7a6a5d;">上傳自己的背景圖片，或隨機切換漫畫風背景。設定只會儲存在這台裝置上。</p>
+    <input type="file" id="bgFileInput" accept="image/*" style="margin:10px 0;" onchange="uploadBgImage(this)">
+    <br><br>
+    <button class="btn-add-student" onclick="randomComicBg()">🎨 隨機漫畫風背景</button>
+    <br><br>
+    <button class="btn-warn" onclick="resetBg()">↩️ 恢復預設背景</button>
+    <br><br>
+    <button class="btn-main modal-close" onclick="closeBgModal()">完成</button>
   </div>
 </div>
 
@@ -351,6 +395,63 @@ function submitClassCode() {
   connectClass(value);
 }
 
+const BG_MODE_KEY = "gacha_bg_mode";
+const BG_IMAGE_KEY = "gacha_bg_image";
+const COMIC_BG_CLASSES = ["bg-comic-1", "bg-comic-2", "bg-comic-3", "bg-comic-4"];
+
+function applyBg(mode, imageDataUrl) {
+  document.body.classList.remove(...COMIC_BG_CLASSES, "bg-custom");
+  document.body.style.backgroundImage = "";
+  if (mode === "custom" && imageDataUrl) {
+    document.body.classList.add("bg-custom");
+    document.body.style.backgroundImage = `url(${imageDataUrl})`;
+  } else if (mode && COMIC_BG_CLASSES.includes(mode)) {
+    document.body.classList.add(mode);
+  }
+}
+
+function loadBgFromStorage() {
+  const mode = localStorage.getItem(BG_MODE_KEY);
+  const image = localStorage.getItem(BG_IMAGE_KEY);
+  if (mode) applyBg(mode, image);
+}
+
+function openBgModal() {
+  document.getElementById("bgModal").classList.add("show");
+}
+function closeBgModal() {
+  document.getElementById("bgModal").classList.remove("show");
+}
+
+function uploadBgImage(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      localStorage.setItem(BG_MODE_KEY, "custom");
+      localStorage.setItem(BG_IMAGE_KEY, reader.result);
+      applyBg("custom", reader.result);
+    } catch (e) {
+      alert("圖片太大，無法儲存，請換一張較小的圖片試試");
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function randomComicBg() {
+  const choice = COMIC_BG_CLASSES[Math.floor(Math.random() * COMIC_BG_CLASSES.length)];
+  localStorage.setItem(BG_MODE_KEY, choice);
+  localStorage.removeItem(BG_IMAGE_KEY);
+  applyBg(choice, null);
+}
+
+function resetBg() {
+  localStorage.removeItem(BG_MODE_KEY);
+  localStorage.removeItem(BG_IMAGE_KEY);
+  applyBg(null, null);
+}
+
 function save() {
   if (!classCode) return;
   clearTimeout(saveTimer);
@@ -455,10 +556,10 @@ function playGacha(idx) {
       const drawn = pool[Math.floor(Math.random() * pool.length)];
       if (drawn.type === "pokemon") {
         capsule.innerHTML = `<img src="${drawn.value.img}" alt="${drawn.value.name}">`;
-        resultEl.textContent = `恭喜 ${students[idx].name} 抽到寶可夢：${drawn.value.name}！`;
+        resultEl.innerHTML = `恭喜 ${escapeHtml(students[idx].name)}！<br>抽到寶可夢：${escapeHtml(drawn.value.name)}`;
       } else {
         capsule.textContent = "🎉";
-        resultEl.textContent = `恭喜 ${students[idx].name} 抽到：${drawn.value}！`;
+        resultEl.innerHTML = `恭喜 ${escapeHtml(students[idx].name)}！<br>抽到：${escapeHtml(drawn.value)}`;
       }
     }
   }, 100);
@@ -507,10 +608,12 @@ Object.assign(window, {
   addStudent, removeStudent, renameStudent, changeScore, resetAllScores,
   playGacha, closeGachaModal, openPrizeModal, closePrizeModal,
   addPrizeRow, removePrize, updatePrize,
-  openClassCodeModal, closeClassCodeModalIfSet, submitClassCode
+  openClassCodeModal, closeClassCodeModalIfSet, submitClassCode,
+  openBgModal, closeBgModal, uploadBgImage, randomComicBg, resetBg
 });
 
 renderStudents();
+loadBgFromStorage();
 
 const savedCode = localStorage.getItem(CLASS_CODE_KEY);
 if (savedCode) {

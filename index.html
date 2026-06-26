@@ -160,6 +160,37 @@
     font-size: 1.1rem;
     animation: pulse 1.2s infinite;
   }
+  .collection-btn {
+    margin-top: 10px;
+    width: 100%;
+    font-size: 0.9rem;
+    padding: 10px 12px;
+  }
+  .collection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 12px;
+    max-height: 420px;
+    overflow-y: auto;
+    margin: 16px 0;
+  }
+  .collection-item {
+    background: #fff7ec;
+    border-radius: 14px;
+    padding: 8px;
+    text-align: center;
+    font-size: 0.8rem;
+  }
+  .collection-item img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+  }
+  .collection-empty {
+    color: #b09a8a;
+    text-align: center;
+    margin: 20px 0;
+  }
   @keyframes pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.05); }
@@ -301,6 +332,15 @@
   </div>
 </div>
 
+<!-- 收藏圖鑑彈窗 -->
+<div class="modal-overlay" id="collectionModal">
+  <div class="modal" style="width:560px;">
+    <h2 id="collectionTitle">📖 寶可夢收藏圖鑑</h2>
+    <div class="collection-grid" id="collectionGrid"></div>
+    <button class="btn-main modal-close" onclick="closeCollectionModal()">關閉</button>
+  </div>
+</div>
+
 <!-- 獎品編輯彈窗 -->
 <div class="modal-overlay" id="prizeModal">
   <div class="modal">
@@ -331,7 +371,7 @@ const db = getFirestore(fbApp);
 const CLASS_CODE_KEY = "gacha_class_code";
 const GOAL = 10;
 
-const defaultStudents = Array.from({length: 10}, (_, i) => ({ name: `學生 ${i+1}`, score: 0 }));
+const defaultStudents = Array.from({length: 10}, (_, i) => ({ name: `學生 ${i+1}`, score: 0, collection: [] }));
 const defaultPrizes = ["寶可夢卡片", "小玩具", "原子筆一隻", "飲料一罐", "貼紙一張"];
 
 let students = defaultStudents;
@@ -482,6 +522,7 @@ function renderStudents() {
       </div>
       <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
       ${s.score >= GOAL ? `<button class="gacha-ready" onclick="playGacha(${idx})">🎰 扭蛋一次！</button>` : ""}
+      <button class="btn-main collection-btn" onclick="openCollectionModal(${idx})">📖 寶可夢收藏圖鑑（${(s.collection || []).length}）</button>
     `;
     grid.appendChild(card);
   });
@@ -505,7 +546,7 @@ function renameStudent(idx, value) {
 }
 
 function addStudent() {
-  students.push({ name: `學生 ${students.length+1}`, score: 0 });
+  students.push({ name: `學生 ${students.length+1}`, score: 0, collection: [] });
   save();
   renderStudents();
 }
@@ -554,15 +595,41 @@ function playGacha(idx) {
         return;
       }
       const drawn = pool[Math.floor(Math.random() * pool.length)];
+      if (!students[idx].collection) students[idx].collection = [];
       if (drawn.type === "pokemon") {
         capsule.innerHTML = `<img src="${drawn.value.img}" alt="${drawn.value.name}">`;
         resultEl.innerHTML = `恭喜 ${escapeHtml(students[idx].name)}！<br>抽到寶可夢：${escapeHtml(drawn.value.name)}`;
+        students[idx].collection.push({ type: "pokemon", name: drawn.value.name, img: drawn.value.img, time: Date.now() });
       } else {
         capsule.textContent = "🎉";
         resultEl.innerHTML = `恭喜 ${escapeHtml(students[idx].name)}！<br>抽到：${escapeHtml(drawn.value)}`;
+        students[idx].collection.push({ type: "text", name: drawn.value, img: null, time: Date.now() });
       }
+      save();
+      renderStudents();
     }
   }, 100);
+}
+
+function openCollectionModal(idx) {
+  const s = students[idx];
+  document.getElementById("collectionTitle").textContent = `📖 ${s.name} 的寶可夢收藏圖鑑`;
+  const grid = document.getElementById("collectionGrid");
+  const collection = s.collection || [];
+  if (!collection.length) {
+    grid.innerHTML = `<div class="collection-empty">還沒有抽到任何獎品，加滿10分就能扭蛋囉！</div>`;
+  } else {
+    grid.innerHTML = collection.slice().reverse().map(item => `
+      <div class="collection-item">
+        ${item.img ? `<img src="${item.img}" alt="${escapeHtml(item.name)}">` : `<div style="font-size:2rem;">🎁</div>`}
+        <div>${escapeHtml(item.name)}</div>
+      </div>
+    `).join("");
+  }
+  document.getElementById("collectionModal").classList.add("show");
+}
+function closeCollectionModal() {
+  document.getElementById("collectionModal").classList.remove("show");
 }
 
 function closeGachaModal() {
@@ -609,7 +676,8 @@ Object.assign(window, {
   playGacha, closeGachaModal, openPrizeModal, closePrizeModal,
   addPrizeRow, removePrize, updatePrize,
   openClassCodeModal, closeClassCodeModalIfSet, submitClassCode,
-  openBgModal, closeBgModal, uploadBgImage, randomComicBg, resetBg
+  openBgModal, closeBgModal, uploadBgImage, randomComicBg, resetBg,
+  openCollectionModal, closeCollectionModal
 });
 
 renderStudents();

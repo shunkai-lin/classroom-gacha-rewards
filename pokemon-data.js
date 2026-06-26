@@ -249,4 +249,5 @@ const POKEMON_LIST = [
   { id: 248, name: "班基拉斯", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/248.png" },
   { id: 249, name: "洛奇亞", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/249.png" },
   { id: 250, name: "鳳王", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/250.png" },
+  { id: 872, name: "雪吞蟲", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/872.png" },
 ];

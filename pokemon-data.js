@@ -250,4 +250,6 @@ const POKEMON_LIST = [
   { id: 249, name: "洛奇亞", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/249.png" },
   { id: 250, name: "鳳王", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/250.png" },
   { id: 872, name: "雪吞蟲", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/872.png" },
+  { id: 485, name: "席多藍恩", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/485.png" },
+  { id: 488, name: "克雷瑟莉亞", img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/488.png" },
 ];

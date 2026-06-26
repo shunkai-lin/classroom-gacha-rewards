@@ -162,6 +162,11 @@
     margin: 20px 0;
     transition: transform 0.15s;
   }
+  .gacha-capsule img {
+    width: 140px;
+    height: 140px;
+    image-rendering: pixelated;
+  }
   .gacha-result {
     font-size: 1.6rem;
     font-weight: bold;
@@ -242,6 +247,7 @@
   </div>
 </div>
 
+<script src="pokemon-data.js"></script>
 <script>
 const STORAGE_KEY = "gacha_students_v1";
 const PRIZE_KEY = "gacha_prizes_v1";
@@ -335,13 +341,27 @@ function playGacha(idx) {
   const maxSpins = 14;
   const icons = ["🥚", "🎁", "⭐", "🍬", "🎈"];
   const interval = setInterval(() => {
-    capsule.textContent = icons[spins % icons.length];
+    capsule.innerHTML = icons[spins % icons.length];
     spins++;
     if (spins >= maxSpins) {
       clearInterval(interval);
-      const prize = prizes.length ? prizes[Math.floor(Math.random() * prizes.length)] : "獎品池是空的，請先新增獎品";
-      capsule.textContent = "🎉";
-      resultEl.textContent = `恭喜 ${students[idx].name} 抽到：${prize}！`;
+      const pool = [
+        ...prizes.map(p => ({ type: "text", value: p })),
+        ...((typeof POKEMON_LIST !== "undefined") ? POKEMON_LIST.map(p => ({ type: "pokemon", value: p })) : [])
+      ];
+      if (!pool.length) {
+        capsule.textContent = "😢";
+        resultEl.textContent = "獎品池是空的，請先新增獎品";
+        return;
+      }
+      const drawn = pool[Math.floor(Math.random() * pool.length)];
+      if (drawn.type === "pokemon") {
+        capsule.innerHTML = `<img src="${drawn.value.img}" alt="${drawn.value.name}">`;
+        resultEl.textContent = `恭喜 ${students[idx].name} 抽到寶可夢：${drawn.value.name}！`;
+      } else {
+        capsule.textContent = "🎉";
+        resultEl.textContent = `恭喜 ${students[idx].name} 抽到：${drawn.value}！`;
+      }
     }
   }, 100);
 }

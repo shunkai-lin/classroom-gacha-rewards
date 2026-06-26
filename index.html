@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>班級加分扭蛋機</title>
+<style>
+  :root {
+    --pink: #ff6fa5;
+    --yellow: #ffd23f;
+    --blue: #4cc9f0;
+    --green: #6fd66f;
+    --purple: #b388ff;
+    --bg: #fff7ec;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Microsoft JhengHei", "PingFang TC", "Heiti TC", sans-serif;
+    background: linear-gradient(135deg, #fff7ec, #ffe9d6);
+    min-height: 100vh;
+    padding: 16px;
+    color: #4a3b32;
+  }
+  h1 {
+    text-align: center;
+    font-size: 2.2rem;
+    color: #ff5c8a;
+    text-shadow: 2px 2px 0 #fff;
+    margin: 10px 0 20px;
+  }
+  .toolbar {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 16px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 12px 20px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+    transition: transform 0.1s;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.15); }
+  .btn-main { background: var(--blue); color: white; }
+  .btn-warn { background: #ff8a65; color: white; }
+  .btn-add-student { background: var(--green); color: white; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 18px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .card {
+    background: white;
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+    text-align: center;
+    position: relative;
+  }
+  .card .name {
+    font-size: 1.4rem;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+  .card .name-input {
+    width: 100%;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-align: center;
+    border: 2px dashed #ffd1e3;
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 8px;
+  }
+  .score-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin: 12px 0;
+  }
+  .score {
+    font-size: 2.4rem;
+    font-weight: bold;
+    color: var(--pink);
+    min-width: 60px;
+  }
+  .score-btns { display: flex; flex-direction: column; gap: 6px; }
+  .score-btns button {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    font-size: 1.4rem;
+    padding: 0;
+  }
+  .plus { background: var(--green); color: white; }
+  .minus { background: #ff7a7a; color: white; }
+  .progress-wrap {
+    background: #f0e9e0;
+    border-radius: 10px;
+    height: 14px;
+    overflow: hidden;
+    margin: 10px 0;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--yellow), var(--pink));
+    transition: width 0.3s;
+  }
+  .remove-student {
+    position: absolute;
+    top: 8px; right: 10px;
+    background: none;
+    color: #bbb;
+    font-size: 1.1rem;
+    box-shadow: none;
+    padding: 2px 8px;
+  }
+  .gacha-ready {
+    background: var(--purple);
+    color: white;
+    margin-top: 10px;
+    width: 100%;
+    font-size: 1.1rem;
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 24px;
+    padding: 30px;
+    max-width: 90%;
+    width: 420px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  .modal h2 { color: #ff5c8a; margin-top: 0; }
+  .gacha-capsule {
+    font-size: 5rem;
+    margin: 20px 0;
+    transition: transform 0.15s;
+  }
+  .gacha-result {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: var(--pink);
+    margin: 10px 0 20px;
+    min-height: 40px;
+  }
+  .prize-list {
+    text-align: left;
+    max-height: 240px;
+    overflow-y: auto;
+    margin: 16px 0;
+  }
+  .prize-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .prize-row input {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 2px solid #ffe0ec;
+    font-size: 1rem;
+  }
+  .prize-row button {
+    background: #ff7a7a;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 10px;
+  }
+  .modal-close {
+    background: #ccc;
+    color: #333;
+    margin-top: 10px;
+  }
+  footer {
+    text-align: center;
+    margin-top: 40px;
+    color: #b09a8a;
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>🎈 班級加分扭蛋機 🎈</h1>
+
+<div class="toolbar">
+  <button class="btn-add-student" onclick="addStudent()">➕ 新增學生</button>
+  <button class="btn-main" onclick="openPrizeModal()">🎁 編輯扭蛋獎品</button>
+  <button class="btn-warn" onclick="resetAllScores()">🔄 重設所有分數</button>
+</div>
+
+<div class="grid" id="studentGrid"></div>
+
+<footer>加滿 10 分即可扭蛋一次 · 資料自動儲存在此瀏覽器中</footer>
+
+<!-- 扭蛋彈窗 -->
+<div class="modal-overlay" id="gachaModal">
+  <div class="modal">
+    <h2>🎉 扭蛋時間！</h2>
+    <div class="gacha-capsule" id="gachaCapsule">🥚</div>
+    <div class="gacha-result" id="gachaResult"></div>
+    <button class="btn-main modal-close" onclick="closeGachaModal()">關閉</button>
+  </div>
+</div>
+
+<!-- 獎品編輯彈窗 -->
+<div class="modal-overlay" id="prizeModal">
+  <div class="modal">
+    <h2>🎁 扭蛋獎品清單</h2>
+    <div class="prize-list" id="prizeList"></div>
+    <button class="btn-add-student" onclick="addPrizeRow()">➕ 新增獎品</button>
+    <br><br>
+    <button class="btn-main modal-close" onclick="closePrizeModal()">完成</button>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "gacha_students_v1";
+const PRIZE_KEY = "gacha_prizes_v1";
+const GOAL = 10;
+
+const defaultStudents = Array.from({length: 10}, (_, i) => ({ name: `學生 ${i+1}`, score: 0 }));
+const defaultPrizes = ["寶可夢卡片", "小玩具", "原子筆一隻", "飲料一罐", "貼紙一張"];
+
+let students = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || defaultStudents;
+let prizes = JSON.parse(localStorage.getItem(PRIZE_KEY) || "null") || defaultPrizes;
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+  localStorage.setItem(PRIZE_KEY, JSON.stringify(prizes));
+}
+
+function renderStudents() {
+  const grid = document.getElementById("studentGrid");
+  grid.innerHTML = "";
+  students.forEach((s, idx) => {
+    const pct = Math.min(100, Math.round((s.score / GOAL) * 100));
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <button class="remove-student" onclick="removeStudent(${idx})">✕</button>
+      <input class="name-input" value="${escapeHtml(s.name)}" onchange="renameStudent(${idx}, this.value)">
+      <div class="score-row">
+        <div class="score-btns">
+          <button class="plus" onclick="changeScore(${idx}, 1)">＋</button>
+          <button class="minus" onclick="changeScore(${idx}, -1)">－</button>
+        </div>
+        <div class="score">${s.score}</div>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+      ${s.score >= GOAL ? `<button class="gacha-ready" onclick="playGacha(${idx})">🎰 扭蛋一次！</button>` : ""}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function changeScore(idx, delta) {
+  students[idx].score = Math.max(0, students[idx].score + delta);
+  save();
+  renderStudents();
+}
+
+function renameStudent(idx, value) {
+  students[idx].name = value || `學生 ${idx+1}`;
+  save();
+}
+
+function addStudent() {
+  students.push({ name: `學生 ${students.length+1}`, score: 0 });
+  save();
+  renderStudents();
+}
+
+function removeStudent(idx) {
+  if (!confirm(`確定要移除「${students[idx].name}」嗎？`)) return;
+  students.splice(idx, 1);
+  save();
+  renderStudents();
+}
+
+function resetAllScores() {
+  if (!confirm("確定要將所有學生的分數重設為 0 嗎？")) return;
+  students.forEach(s => s.score = 0);
+  save();
+  renderStudents();
+}
+
+function playGacha(idx) {
+  students[idx].score -= GOAL;
+  save();
+  renderStudents();
+
+  const modal = document.getElementById("gachaModal");
+  const capsule = document.getElementById("gachaCapsule");
+  const resultEl = document.getElementById("gachaResult");
+  resultEl.textContent = "";
+  capsule.textContent = "🥚";
+  modal.classList.add("show");
+
+  let spins = 0;
+  const maxSpins = 14;
+  const icons = ["🥚", "🎁", "⭐", "🍬", "🎈"];
+  const interval = setInterval(() => {
+    capsule.textContent = icons[spins % icons.length];
+    spins++;
+    if (spins >= maxSpins) {
+      clearInterval(interval);
+      const prize = prizes.length ? prizes[Math.floor(Math.random() * prizes.length)] : "獎品池是空的，請先新增獎品";
+      capsule.textContent = "🎉";
+      resultEl.textContent = `恭喜 ${students[idx].name} 抽到：${prize}！`;
+    }
+  }, 100);
+}
+
+function closeGachaModal() {
+  document.getElementById("gachaModal").classList.remove("show");
+}
+
+function openPrizeModal() {
+  renderPrizeList();
+  document.getElementById("prizeModal").classList.add("show");
+}
+function closePrizeModal() {
+  document.getElementById("prizeModal").classList.remove("show");
+  save();
+}
+
+function renderPrizeList() {
+  const list = document.getElementById("prizeList");
+  list.innerHTML = "";
+  prizes.forEach((p, idx) => {
+    const row = document.createElement("div");
+    row.className = "prize-row";
+    row.innerHTML = `
+      <input value="${escapeHtml(p)}" onchange="updatePrize(${idx}, this.value)">
+      <button onclick="removePrize(${idx})">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function updatePrize(idx, value) {
+  prizes[idx] = value;
+}
+function addPrizeRow() {
+  prizes.push("新獎品");
+  renderPrizeList();
+}
+function removePrize(idx) {
+  prizes.splice(idx, 1);
+  renderPrizeList();
+}
+
+renderStudents();
+</script>
+</body>
+</html>

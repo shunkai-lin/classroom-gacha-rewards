@@ -316,6 +316,7 @@
   <button class="btn-warn" onclick="resetAllScores()">🔄 重設所有分數</button>
   <button class="modal-close" onclick="openClassCodeModal()">🔑 班級代碼：<span id="classCodeLabel">--</span></button>
   <button class="btn-main" onclick="openBgModal()">🖼️ 背景設定</button>
+  <button class="modal-close" id="unlimitedToggleBtn" onclick="toggleUnlimitedMode()">🔓 隱藏功能</button>
 </div>
 
 <div id="syncStatus" style="text-align:center; margin-bottom:10px; color:#9c8a7d; font-size:0.85rem;"></div>
@@ -411,6 +412,34 @@ let prizes = defaultPrizes;
 let classCode = "";
 let unsubscribe = null;
 let saveTimer = null;
+
+const UNLIMITED_KEY = "gacha_unlimited_mode";
+const UNLIMITED_PASSWORD = "teacher888";
+let unlimitedMode = localStorage.getItem(UNLIMITED_KEY) === "1";
+
+function updateUnlimitedToggleLabel() {
+  document.getElementById("unlimitedToggleBtn").textContent = unlimitedMode ? "♾️ 無限扭蛋模式：開啟" : "🔓 隱藏功能";
+}
+
+function toggleUnlimitedMode() {
+  if (unlimitedMode) {
+    unlimitedMode = false;
+    localStorage.removeItem(UNLIMITED_KEY);
+    updateUnlimitedToggleLabel();
+    renderStudents();
+    return;
+  }
+  const input = prompt("請輸入專屬密碼以解鎖無限扭蛋模式：");
+  if (input === null) return;
+  if (input !== UNLIMITED_PASSWORD) {
+    alert("密碼錯誤");
+    return;
+  }
+  unlimitedMode = true;
+  localStorage.setItem(UNLIMITED_KEY, "1");
+  updateUnlimitedToggleLabel();
+  renderStudents();
+}
 
 function classDocRef(code) {
   return doc(db, "classes", code);
@@ -553,7 +582,7 @@ function renderStudents() {
         <div class="score">${s.score}</div>
       </div>
       <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
-      ${s.score >= GOAL ? `<button class="gacha-ready" onclick="playGacha(${idx})">🎰 扭蛋一次！</button>` : ""}
+      ${(s.score >= GOAL || unlimitedMode) ? `<button class="gacha-ready" onclick="playGacha(${idx})">🎰 扭蛋一次！${unlimitedMode ? "（無限）" : ""}</button>` : ""}
       <button class="btn-main collection-btn" onclick="openCollectionModal(${idx})">📖 扭蛋收藏圖鑑（${(s.collection || []).length}）</button>
     `;
     grid.appendChild(card);
@@ -598,7 +627,9 @@ function resetAllScores() {
 }
 
 function playGacha(idx) {
-  students[idx].score -= GOAL;
+  if (!unlimitedMode) {
+    students[idx].score = Math.max(0, students[idx].score - GOAL);
+  }
   save();
   renderStudents();
 
@@ -709,11 +740,12 @@ Object.assign(window, {
   addPrizeRow, removePrize, updatePrize,
   openClassCodeModal, closeClassCodeModalIfSet, submitClassCode,
   openBgModal, closeBgModal, uploadBgImage, randomComicBg, resetBg,
-  openCollectionModal, closeCollectionModal
+  openCollectionModal, closeCollectionModal, toggleUnlimitedMode
 });
 
 renderStudents();
 loadBgFromStorage();
+updateUnlimitedToggleLabel();
 
 const savedCode = localStorage.getItem(CLASS_CODE_KEY);
 if (savedCode) {

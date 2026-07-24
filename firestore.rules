@@ -21,5 +21,24 @@ service cloud.firestore {
         && data.prizes is list
         && data.prizes.size() <= 100;
     }
+
+    // 喵喵版（自訂上傳獎品圖片）：獨立 kitty 集合，與 classes 互不干擾。
+    // 多一個 imagePrizes 欄位放老師上傳的圖片（已在前端壓縮成小縮圖）。
+    match /kitty/{classId} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if isValidKittyData();
+    }
+
+    function isValidKittyData() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['students', 'prizes', 'imagePrizes'])
+        && data.students is list
+        && data.students.size() <= 300
+        && data.prizes is list
+        && data.prizes.size() <= 100
+        && data.imagePrizes is list
+        && data.imagePrizes.size() <= 40;
+    }
   }
 }

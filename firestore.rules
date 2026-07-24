@@ -1,8 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // 班級資料：以「班級代碼」當文件 ID。
+    // 設計上採用「代碼即密碼」的無登入模式，但仍加上以下防護：
+    //  - 禁止 list：不能列舉整個 classes 集合，避免有人一次撈走所有班級的資料
+    //  - 限制寫入結構與大小：只允許 students / prizes 兩個欄位，並限制筆數，
+    //    防止有人把資料庫當免費儲存空間亂塞或灌爆單一文件
     match /classes/{classId} {
-      allow read, write: if true;
+      allow get: if true;
+      allow list: if false;
+      allow write: if isValidClassData();
+    }
+
+    function isValidClassData() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['students', 'prizes'])
+        && data.students is list
+        && data.students.size() <= 300
+        && data.prizes is list
+        && data.prizes.size() <= 100;
     }
   }
 }

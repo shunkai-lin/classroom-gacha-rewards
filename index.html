@@ -414,14 +414,22 @@ let unsubscribe = null;
 let saveTimer = null;
 
 const UNLIMITED_KEY = "gacha_unlimited_mode";
-const UNLIMITED_PASSWORD = "teacher888";
+// 只存密碼的 SHA-256 雜湊，不放明文，讓看原始碼也拿不到密碼本身。
+// 註：純前端 App 無法做到真正保密（進階使用者仍可直接改 localStorage 繞過），
+// 這裡只是把門檻提高到「看原始碼看不出密碼」的程度。
+const UNLIMITED_PASSWORD_HASH = "998f04ad255d1dcc3109d576ffca45c452bc9e7ef5538ed11b29ec6e96d9825f";
 let unlimitedMode = localStorage.getItem(UNLIMITED_KEY) === "1";
+
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 function updateUnlimitedToggleLabel() {
   document.getElementById("unlimitedToggleBtn").textContent = unlimitedMode ? "♾️ 無限扭蛋模式：開啟" : "🔓 隱藏功能";
 }
 
-function toggleUnlimitedMode() {
+async function toggleUnlimitedMode() {
   if (unlimitedMode) {
     unlimitedMode = false;
     localStorage.removeItem(UNLIMITED_KEY);
@@ -431,7 +439,7 @@ function toggleUnlimitedMode() {
   }
   const input = prompt("請輸入專屬密碼以解鎖無限扭蛋模式：");
   if (input === null) return;
-  if (input !== UNLIMITED_PASSWORD) {
+  if (await sha256Hex(input) !== UNLIMITED_PASSWORD_HASH) {
     alert("密碼錯誤");
     return;
   }

@@ -200,28 +200,55 @@
   }
   .collection-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
     gap: 12px;
     max-height: 420px;
     overflow-y: auto;
     margin: 16px 0;
   }
   .collection-item {
+    position: relative;
     background: #fff7ec;
     border-radius: 14px;
     padding: 8px;
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
+    line-height: 1.3;
   }
   .collection-item img {
     width: 64px;
     height: 64px;
     object-fit: contain;
   }
+  /* 重複抽到同一角色會升級，等級以徽章顯示在右上角 */
+  .lv-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: linear-gradient(135deg, #ffb347, #ff7043);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: bold;
+    border-radius: 999px;
+    padding: 2px 9px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+  .lv-badge.lv-high { background: linear-gradient(135deg, #ff5c8a, #b14bff); }
+  .collection-series {
+    display: block;
+    color: #b09a8a;
+    font-size: 0.8rem;
+  }
   .collection-empty {
     color: #b09a8a;
     text-align: center;
     margin: 20px 0;
+  }
+  .levelup-note {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #ff7043;
+    margin-top: 6px;
   }
   @keyframes pulse {
     0%, 100% { transform: scale(1); }
@@ -386,6 +413,8 @@
 </div>
 
 <script src="pokemon-data.js"></script>
+<script src="acnh-data.js"></script>
+<script src="sailormoon-data.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
@@ -403,6 +432,43 @@ const db = getFirestore(fbApp);
 
 const CLASS_CODE_KEY = "gacha_class_code";
 const GOAL = 10;
+
+// ── 扭蛋池：三個角色系列 ＋ 老師自訂的文字獎品 ──────────────────────
+// weight 是「系列」被抽中的相對機率：先決定系列，再從該系列裡等機率抽一隻。
+// 之所以不把全部角色混在一起平均抽，是因為動森村民 391 隻、寶可夢 250 隻、
+// 美少女戰士 29 位，混在一起會讓小系列幾乎抽不到，重複升級也幾乎不會觸發。
+// 要調整比例直接改 weight；改成 0 就等於關掉那個系列。
+const SERIES = [
+  { key: "pokemon",    label: "寶可夢",     weight: 32, list: () => (typeof POKEMON_LIST     !== "undefined" ? POKEMON_LIST     : []) },
+  { key: "acnh",       label: "動物森友會", weight: 32, list: () => (typeof ACNH_LIST        !== "undefined" ? ACNH_LIST        : []) },
+  { key: "sailormoon", label: "美少女戰士", weight: 32, list: () => (typeof SAILORMOON_LIST  !== "undefined" ? SAILORMOON_LIST  : []) }
+];
+const TEXT_PRIZE_WEIGHT = 2;   // 老師自訂的實體獎品（貼紙、飲料⋯）被抽中的相對機率，≈2%，與加角色前一致
+
+const SERIES_LABEL = Object.fromEntries(SERIES.map(s => [s.key, s.label]));
+
+// 從加權池抽一件獎品；回傳 { type, name, img } 或 null（池是空的）
+function drawPrize() {
+  const buckets = [];
+  if (prizes.length) buckets.push({ type: "text", weight: TEXT_PRIZE_WEIGHT, items: prizes });
+  SERIES.forEach(s => {
+    const items = s.list();
+    if (items.length && s.weight > 0) buckets.push({ type: s.key, weight: s.weight, items });
+  });
+  const total = buckets.reduce((sum, b) => sum + b.weight, 0);
+  if (!total) return null;
+  let roll = Math.random() * total;
+  const bucket = buckets.find(b => (roll -= b.weight) < 0) || buckets[buckets.length - 1];
+  const picked = bucket.items[Math.floor(Math.random() * bucket.items.length)];
+  return bucket.type === "text"
+    ? { type: "text", name: picked, img: null }
+    : { type: bucket.type, name: picked.name, img: picked.img };
+}
+
+// 同一個角色抽到幾次就是幾級（沿用既有的收藏陣列，舊資料不用轉檔）
+function countOwned(collection, item) {
+  return (collection || []).filter(c => c.type === item.type && c.name === item.name).length;
+}
 
 const defaultStudents = Array.from({length: 10}, (_, i) => ({ name: `學生 ${i+1}`, score: 0, collection: [] }));
 const defaultPrizes = ["寶可夢卡片", "小玩具", "原子筆一隻", "飲料一罐", "貼紙一張"];
@@ -591,7 +657,7 @@ function renderStudents() {
       </div>
       <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
       ${(s.score >= GOAL || unlimitedMode) ? `<button class="gacha-ready" onclick="playGacha(${idx})">🎰 扭蛋一次！${unlimitedMode ? "（無限）" : ""}</button>` : ""}
-      <button class="btn-main collection-btn" onclick="openCollectionModal(${idx})">📖 扭蛋收藏圖鑑（${(s.collection || []).length}）</button>
+      <button class="btn-main collection-btn" onclick="openCollectionModal(${idx})">📖 扭蛋收藏圖鑑（${groupCollection(s.collection).length} 種／共 ${(s.collection || []).length} 抽）</button>
     `;
     grid.appendChild(card);
   });
@@ -656,30 +722,52 @@ function playGacha(idx) {
     spins++;
     if (spins >= maxSpins) {
       clearInterval(interval);
-      const pool = [
-        ...prizes.map(p => ({ type: "text", value: p })),
-        ...((typeof POKEMON_LIST !== "undefined") ? POKEMON_LIST.map(p => ({ type: "pokemon", value: p })) : [])
-      ];
-      if (!pool.length) {
+      const drawn = drawPrize();
+      if (!drawn) {
         capsule.textContent = "😢";
         resultEl.textContent = "獎品池是空的，請先新增獎品";
         return;
       }
-      const drawn = pool[Math.floor(Math.random() * pool.length)];
       if (!students[idx].collection) students[idx].collection = [];
-      if (drawn.type === "pokemon") {
-        capsule.innerHTML = `<img src="${drawn.value.img}" alt="${drawn.value.name}">`;
-        resultEl.innerHTML = `恭喜 ${escapeHtml(students[idx].name)}！<br>抽到寶可夢：${escapeHtml(drawn.value.name)}`;
-        students[idx].collection.push({ type: "pokemon", name: drawn.value.name, img: drawn.value.img, time: Date.now() });
+      const level = countOwned(students[idx].collection, drawn) + 1;
+      students[idx].collection.push({ type: drawn.type, name: drawn.name, img: drawn.img, time: Date.now() });
+
+      const who = escapeHtml(students[idx].name);
+      const what = escapeHtml(drawn.name);
+      if (drawn.img) {
+        const series = SERIES_LABEL[drawn.type] || "角色";
+        // referrerpolicy="no-referrer"：美少女戰士的圖放在 Fandom，帶 referer 會被擋成佔位圖
+        capsule.innerHTML = `<img src="${drawn.img}" alt="${what}" referrerpolicy="no-referrer">`;
+        resultEl.innerHTML = level > 1
+          ? `${who} 又抽到${escapeHtml(series)}：${what}！`
+            + `<div class="levelup-note">⭐ 重複角色升級 → Lv.${level}</div>`
+          : `恭喜 ${who}！<br>抽到${escapeHtml(series)}：${what}`;
       } else {
         capsule.textContent = "🎉";
-        resultEl.innerHTML = `恭喜 ${escapeHtml(students[idx].name)}！<br>抽到：${escapeHtml(drawn.value)}`;
-        students[idx].collection.push({ type: "text", name: drawn.value, img: null, time: Date.now() });
+        resultEl.innerHTML = `恭喜 ${who}！<br>抽到：${what}`;
       }
       save();
       renderStudents();
     }
   }, 100);
+}
+
+// 把「每抽一次就 push 一筆」的收藏紀錄，收攏成「每個角色一格 ＋ 等級」
+// 等級＝抽到的次數，最近抽到的排最前面。
+function groupCollection(collection) {
+  const map = new Map();
+  (collection || []).forEach(item => {
+    const key = `${item.type}|${item.name}`;
+    const g = map.get(key);
+    if (g) {
+      g.level += 1;
+      g.lastTime = Math.max(g.lastTime, item.time || 0);
+      if (!g.img && item.img) g.img = item.img;
+    } else {
+      map.set(key, { type: item.type, name: item.name, img: item.img, level: 1, lastTime: item.time || 0 });
+    }
+  });
+  return [...map.values()].sort((a, b) => b.lastTime - a.lastTime);
 }
 
 function openCollectionModal(idx) {
@@ -690,10 +778,12 @@ function openCollectionModal(idx) {
   if (!collection.length) {
     grid.innerHTML = `<div class="collection-empty">還沒有抽到任何獎品，加滿10分就能扭蛋囉！</div>`;
   } else {
-    grid.innerHTML = collection.slice().reverse().map(item => `
+    grid.innerHTML = groupCollection(collection).map(item => `
       <div class="collection-item">
-        ${item.img ? `<img src="${item.img}" alt="${escapeHtml(item.name)}">` : `<div style="font-size:2rem;">🎁</div>`}
+        ${item.level > 1 ? `<span class="lv-badge${item.level >= 5 ? " lv-high" : ""}">Lv.${item.level}</span>` : ""}
+        ${item.img ? `<img src="${item.img}" alt="${escapeHtml(item.name)}" referrerpolicy="no-referrer">` : `<div style="font-size:2rem;">🎁</div>`}
         <div>${escapeHtml(item.name)}</div>
+        ${SERIES_LABEL[item.type] ? `<span class="collection-series">${escapeHtml(SERIES_LABEL[item.type])}</span>` : ""}
       </div>
     `).join("");
   }

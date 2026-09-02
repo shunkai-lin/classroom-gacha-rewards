@@ -415,6 +415,10 @@
 <script src="pokemon-data.js"></script>
 <script src="acnh-data.js"></script>
 <script src="sailormoon-data.js"></script>
+<script src="mario-data.js"></script>
+<script src="spiderman-data.js"></script>
+<script src="pixar-data.js"></script>
+<script src="princess-data.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
@@ -433,17 +437,21 @@ const db = getFirestore(fbApp);
 const CLASS_CODE_KEY = "gacha_class_code";
 const GOAL = 10;
 
-// ── 扭蛋池：三個角色系列 ＋ 老師自訂的文字獎品 ──────────────────────
+// ── 扭蛋池：七個角色系列 ＋ 老師自訂的文字獎品 ──────────────────────
 // weight 是「系列」被抽中的相對機率：先決定系列，再從該系列裡等機率抽一隻。
-// 之所以不把全部角色混在一起平均抽，是因為動森村民 391 隻、寶可夢 250 隻、
-// 美少女戰士 29 位，混在一起會讓小系列幾乎抽不到，重複升級也幾乎不會觸發。
+// 不把全部角色混在一起平均抽，是因為各系列角色數量差很多；先抽系列，
+// 再從該系列等機率抽一位，才能讓小系列也有合理的出現與升級機會。
 // 要調整比例直接改 weight；改成 0 就等於關掉那個系列。
 const SERIES = [
-  { key: "pokemon",    label: "寶可夢",     weight: 32, list: () => (typeof POKEMON_LIST     !== "undefined" ? POKEMON_LIST     : []) },
-  { key: "acnh",       label: "動物森友會", weight: 32, list: () => (typeof ACNH_LIST        !== "undefined" ? ACNH_LIST        : []) },
-  { key: "sailormoon", label: "美少女戰士", weight: 32, list: () => (typeof SAILORMOON_LIST  !== "undefined" ? SAILORMOON_LIST  : []) }
+  { key: "pokemon",    label: "寶可夢",       weight: 14, list: () => (typeof POKEMON_LIST    !== "undefined" ? POKEMON_LIST    : []) },
+  { key: "acnh",       label: "動物森友會",   weight: 14, list: () => (typeof ACNH_LIST       !== "undefined" ? ACNH_LIST       : []) },
+  { key: "sailormoon", label: "美少女戰士",   weight: 14, list: () => (typeof SAILORMOON_LIST !== "undefined" ? SAILORMOON_LIST : []) },
+  { key: "mario",      label: "瑪利歐系列",   weight: 14, list: () => (typeof MARIO_LIST      !== "undefined" ? MARIO_LIST      : []) },
+  { key: "spiderman",  label: "蜘蛛人系列",   weight: 14, list: () => (typeof SPIDERMAN_LIST  !== "undefined" ? SPIDERMAN_LIST  : []) },
+  { key: "pixar",      label: "皮克斯動畫",   weight: 14, list: () => (typeof PIXAR_LIST      !== "undefined" ? PIXAR_LIST      : []) },
+  { key: "princess",   label: "迪士尼公主",   weight: 14, list: () => (typeof PRINCESS_LIST   !== "undefined" ? PRINCESS_LIST   : []) }
 ];
-const TEXT_PRIZE_WEIGHT = 2;   // 老師自訂的實體獎品（貼紙、飲料⋯）被抽中的相對機率，≈2%，與加角色前一致
+const TEXT_PRIZE_WEIGHT = 2;   // 老師自訂的實體獎品（貼紙、飲料⋯）約 2% 機率
 
 const SERIES_LABEL = Object.fromEntries(SERIES.map(s => [s.key, s.label]));
 
